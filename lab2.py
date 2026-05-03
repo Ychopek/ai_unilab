@@ -1,103 +1,64 @@
 import pandas as pd
-import numpy as np
-
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LinearRegression, LogisticRegression
-from sklearn.metrics import mean_squared_error, accuracy_score
-from sklearn.preprocessing import StandardScaler
-
-# 1. Загрузка
+from sklearn.metrics import mean_squared_error, r2_score, accuracy_score, classification_report
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
 
 df = pd.read_csv("train.csv")
-print("First rows:")
-print(df.head())
 
-# 2. Проверка
+num_cols = df.select_dtypes(include=['number']).columns
+cat_cols = df.select_dtypes(include=['object', 'string']).columns
 
-print("\nData info:")
-df.info()
+df[num_cols] = df[num_cols].fillna(df[num_cols].median())
+for col in cat_cols:
+    df[col] = df[col].fillna(df[col].mode()[0])
 
-print("\nNaN before cleaning:")
-print(df.isnull().sum().sum())
-
-
-# 3. Очистка данных
-
-cat_cols = df.select_dtypes(include=["object", "string"]).columns
-print("\nCategorical columns:")
-print(cat_cols)
 df = pd.get_dummies(df, columns=cat_cols, drop_first=True)
-df = df.copy()
-print("\nAfter encoding:")
-print(df.head())
 
-df = df.fillna(df.mean(numeric_only=True))
-print("\nNaN after cleaning:")
-print(df.isnull().sum().sum())
 
-# 4. Регрессия
 
-print("\n Регрессия")
 
-X = df.drop("SalePrice", axis=1)
-y = df["SalePrice"]
+print("РЕГРЕССИЯ")
 
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=42
+# предсказание SalePrice
+X_reg = df.drop("SalePrice", axis=1)
+y_reg = df["SalePrice"]
+
+# Разделение  обучение/тест
+X_train_r, X_test_r, y_train_r, y_test_r = train_test_split(
+    X_reg, y_reg, test_size=0.2, random_state=42
 )
-
-print("Train shape:", X_train.shape)
-print("Test shape:", X_test.shape)
 
 model_reg = LinearRegression()
-model_reg.fit(X_train, y_train)
+model_reg.fit(X_train_r, y_train_r)
 
+y_pred_r = model_reg.predict(X_test_r)
 
+print(f"Среднеквадратичная ошибка: {mean_squared_error(y_test_r, y_pred_r):.2f}")
+print(f"Коэффициент детерминации: {r2_score(y_test_r, y_pred_r):.4f}")
 
-y_pred = model_reg.predict(X_test)
+print("\nКЛАССИФИКАЦИЯ")
 
-mse = mean_squared_error(y_test, y_pred)
-print("MSE:", mse)
+# 1 — дорогой дом, 0 — дешевый
+median_price = df["SalePrice"].median()
+df["IsExpensive"] = (df["SalePrice"] > median_price).astype(int)
 
-print("\nSample predictions:")
-print(pd.DataFrame({
-    "Real": y_test.values[:5],
-    "Predicted": y_pred[:5]
-}))
+X_clf = df.drop(["SalePrice", "IsExpensive"], axis=1)
+y_clf = df["IsExpensive"]
 
-# 5. Классификация
-print("\n--- CLASSIFICATION ---")
-
-df = df.assign(
-    PriceCategory=(df["SalePrice"] > df["SalePrice"].median()).astype(int)
+X_train_c, X_test_c, y_train_c, y_test_c = train_test_split(
+    X_clf, y_clf, test_size=0.2, random_state=42
 )
 
-print("Class distribution:")
-print(df["PriceCategory"].value_counts())
-
-X = df.drop(["SalePrice", "PriceCategory"], axis=1)
-y = df["PriceCategory"]
-X = X.iloc[:, :50]
-
-X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.2, random_state=42
-)
 scaler = StandardScaler()
+X_train_c = scaler.fit_transform(X_train_c)
+X_test_c = scaler.transform(X_test_c)
 
-X_train = scaler.fit_transform(X_train)
-X_test = scaler.transform(X_test)
+model_clf = LogisticRegression(max_iter=1000)
+model_clf.fit(X_train_c, y_train_c)
 
-model_clf = LogisticRegression(max_iter=2000, solver="liblinear")
-model_clf.fit(X_train, y_train)
+y_pred_c = model_clf.predict(X_test_c)
 
-y_pred = model_clf.predict(X_test)
-
-acc = accuracy_score(y_test, y_pred)
-print("Accuracy:", acc)
-
-print("\nSample classification:")
-print(pd.DataFrame({
-    "Real": y_test.values[:5],
-    "Predicted": y_pred[:5]
-}))
-
+print(f"Точность: {accuracy_score(y_test_c, y_pred_c):.4f}")
+print("\nотчет:")
+print(classification_report(y_test_c, y_pred_c))

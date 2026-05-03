@@ -11,8 +11,11 @@ pd.set_option("display.max_columns", None)
 print("Before:")
 print(df["LotFrontage"].isnull().sum())
 
-df["LotFrontage"] = df["LotFrontage"].replace("NA", pd.NA)
-df["LotFrontage"] = df["LotFrontage"].fillna(df["LotFrontage"].mean())
+
+
+for column in df.select_dtypes(include=['float64', 'int64']).columns:
+     df[column] = df[column].replace("NA", pd.NA)
+     df[column] = df[column].fillna(df[column].mean())
 
 print("After:")
 print(df["LotFrontage"].isnull().sum())
@@ -20,11 +23,12 @@ print(df["LotFrontage"].isnull().sum())
 
 print(df["LotArea"].describe())
 scaler = MinMaxScaler()
-df["LotArea"] = scaler.fit_transform(df[["LotArea"]])
+for column in df.select_dtypes(include=['float64', 'int64']).columns:
+    df[column] = scaler.fit_transform(df[[column]])
 print(df["LotArea"].describe())
 
-
-df= pd.get_dummies(df, columns=['Neighborhood'],
+for column in df.select_dtypes(include=['object', 'string']).columns:
+        df= pd.get_dummies(df, columns=[column],
 drop_first=True)
 
 df.filter(like="Neighborhood").head(10)
